@@ -48,3 +48,19 @@ t:print("myc","is","man")
 delete(t)
 
 ```
+
+## 常用辅助类
+### dump
+```lua
+
+local player = {};
+player.money = 100;
+player.uid = "12dcc1dcxfsdfdvdvg";
+player.name = "myc"
+
+dump(player)--打印玩家数据
+
+dumpToFile("player",player)--打印玩家数据
+
+
+```
