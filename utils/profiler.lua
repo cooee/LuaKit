@@ -5,7 +5,7 @@
 
 Date   2018-05-08 10:35:19
 Last Modified by   YuchengMo
-Last Modified time 2019-06-17 11:12:13
+Last Modified time 2019-06-17 14:34:10
 ]]
 
 
@@ -26,7 +26,7 @@ Last Modified time 2019-06-17 11:12:13
 
     profiler:stop()
 
-    profiler:dump_report_to_file( "profiler.txt" )
+    profiler:dumpReportToFile( "profiler.txt" )
 
 
 --]]
@@ -77,7 +77,7 @@ local profiler = newProfiler("call")
 profiler:start();
 -- local a = new({}); do someting
 profiler:stop();
-profiler:dump_report_to_file( "profile.txt" )
+profiler:dumpReportToFile( "profile.txt" )
 ]]
 local function newProfiler(variant)
     if Profiler.running then
@@ -462,9 +462,9 @@ end
         profiler:start();
         -- do something
         profiler:stop();
-        profiler:dump_report_to_file("path");
+        profiler:dumpReportToFile("path");
 ]]
-function Profiler.dump_report_to_file(self,outfile)
+function Profiler.dumpReportToFile(self,outfile)
     local outfile = io.open(outfile, "w+" )
     local lines, total_time= self:report()
     for i,v in ipairs(lines) do
