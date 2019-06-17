@@ -2,7 +2,7 @@
 @Author: myc
 @Date:   2019-06-17 10:39:37
 @Last Modified by   YuchengMo
-@Last Modified time 2019-06-17 11:06:52
+@Last Modified time 2019-06-17 11:15:03
 ]]
 
 require("LuaKit");
@@ -48,4 +48,12 @@ player.money = 100;
 player.uid = "12dcc1dcxfsdfdvdvg";
 player.name = "myc"
 
-dump(play)
+
+local profiler = newProfiler("call") --
+profiler:start() --开启性能分析
+
+dump(player) --要测试的代码
+
+profiler:stop() --结束分析
+
+profiler:dump_report_to_file( "profiler.txt" ) --输出报告保存到文件
