@@ -65,7 +65,7 @@ dumpToFile("player",player)--打印玩家数据
 
 ```
 
-### 性能更新检测工具profiler
+### 性能检测工具profiler
 ```lua
 
 local player = {};
