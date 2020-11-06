@@ -5,7 +5,7 @@
 
 Date   2018-05-08 10:35:19
 Last Modified by   YuchengMo
-Last Modified time 2019-06-17 14:34:10
+Last Modified time 2019-10-16 16:07:43
 ]]
 
 
@@ -19,14 +19,14 @@ Last Modified time 2019-06-17 14:34:10
 
   Example usage:
 
-    profiler = newProfiler("call")
+    profiler = new_profiler("call")
     profiler:start()
 
     < call some functions that take time >
 
     profiler:stop()
 
-    profiler:dumpReportToFile( "profiler.txt" )
+    profiler:dump_report_to_file( "profiler.txt" )
 
 
 --]]
@@ -69,17 +69,17 @@ local Profiler = {}
 --[[---
 创建一个性能分析工具对象
 @string variant 性能分析模式 "call" or "time"
-@function newProfiler
+@function new_profiler
 @return     table     性能分析对象
 @usage
-local newProfiler = import("bos.core.profiler").newProfiler
-local profiler = newProfiler("call")
+local new_profiler = import("bos.core.profiler").new_profiler
+local profiler = new_profiler("call")
 profiler:start();
 -- local a = new({}); do someting
 profiler:stop();
-profiler:dumpReportToFile( "profile.txt" )
+profiler:dump_report_to_file( "profile.txt" )
 ]]
-local function newProfiler(variant)
+local function new_profiler(variant)
     if Profiler.running then
         print("Profiler already running.")
         return
@@ -106,8 +106,8 @@ end
 启动性能分析，核心是利用debug.sethook 对函数调用进行钩子
 每次只能启动一个
 @usage
-    local newProfiler = import("bos.core.profiler")
-    local profiler = newProfiler("call")
+    local new_profiler = import("bos.core.profiler")
+    local profiler = new_profiler("call")
     profiler:start();
     -- do something
 ]]
@@ -128,6 +128,16 @@ function Profiler:start()
         self.setstepmul = collectgarbage("setstepmul");
         collectgarbage("setpause", 300);
         collectgarbage("setstepmul", 5000);
+
+        self.coroutine_create = coroutine.create
+        self.coroutines = {}
+        coroutine.create = function(...)
+            local co = self.coroutine_create(...)
+            table.insert(self.coroutines, co)
+            debug.sethook(co,profiler_hook_wrapper_by_call, "cr")
+            return co
+        end
+
         debug.sethook( profiler_hook_wrapper_by_call, "cr" )
     else
         error("Profiler method must be 'time' or 'call'.")
@@ -139,8 +149,8 @@ end
 --[[--
     停止性能分析，如果没启动则没有任何效果
     @usage
-        local newProfiler = import("bos.core.profiler")
-        local profiler = newProfiler("call")
+        local new_profiler = import("bos.core.profiler")
+        local profiler = new_profiler("call")
         profiler:start();
         -- do something
         profiler:stop();
@@ -151,6 +161,19 @@ function Profiler:stop()
         return
     end
     self.end_time = clockNow();
+
+    if self.coroutine_create then
+        coroutine.create = self.coroutine_create
+        self.coroutine_create = nil
+    end
+    
+    if self.coroutines then
+        for i,co in ipairs(self.coroutines) do
+            debug.sethook( co, nil )
+        end
+        self.coroutines = nil
+    end
+
     -- Stop the profiler.
     debug.sethook( nil )
     if self.variant == "call" then
@@ -344,8 +367,8 @@ end
     @return     table     报表
     @return     number     性能分析总时间
     @usage
-        local newProfiler = import("bos.core.profiler")
-        local profiler = newProfiler("call")
+        local new_profiler = import("bos.core.profiler")
+        local profiler = new_profiler("call")
         profiler:start();
         -- do something
         profiler:stop();
@@ -457,14 +480,14 @@ end
     @tparam     string     outfile    文件名称
     @return   number 本次总共花费时间
     @usage
-        local newProfiler = import("bos.core.profiler")
-        local profiler = newProfiler("call")
+        local new_profiler = import("bos.core.profiler")
+        local profiler = new_profiler("call")
         profiler:start();
         -- do something
         profiler:stop();
-        profiler:dumpReportToFile("path");
+        profiler:dump_report_to_file("path");
 ]]
-function Profiler.dumpReportToFile(self,outfile)
+function Profiler.dump_report_to_file(self,outfile)
     local outfile = io.open(outfile, "w+" )
     local lines, total_time= self:report()
     for i,v in ipairs(lines) do
@@ -474,6 +497,8 @@ function Profiler.dumpReportToFile(self,outfile)
     outfile:close()
     return total_time
 end
+
+
 
 
 --[[
@@ -527,4 +552,121 @@ function Profiler:pretty_name(func,force)
     return name
 end
 
-return newProfiler
+--[[--
+    格式化数据
+    @return   table 返回性能分析结果表
+    @usage
+        local new_profiler = import("bos.core.profiler")
+        local profiler = new_profiler("call")
+        profiler:start();
+        -- do something
+        profiler:stop();
+        profiler:format_data();
+]]
+function Profiler:format_data()
+    local function get_item( info )
+        return {
+            name = info.func_info.name,
+            count = info.count,
+            time = info.time,
+            src = info.func_info.short_src,
+            what = info.func_info.what,
+            line = info.func_info.linedefined,
+            -- children_time = info.children_time,
+            -- todo self_time
+            children = {}
+        }
+    end
+
+    local function fill_children( src, dst )
+        local children_time = 0
+        for sub_func,count in pairs(src.children) do
+            if self.caller_cache[sub_func] then
+                local c = get_item(self.caller_cache[sub_func])
+                c.count = count
+                c.time = src.children_time[sub_func]
+                children_time = children_time + c.time
+                table.insert(dst.children, c)
+            end
+        end
+        dst.children_time = children_time
+        if dst.time then
+            dst.self_time = dst.time - children_time
+            if dst.self_time < 0 then
+                dst.self_time = nil
+            end
+        end
+    end
+
+    local function get_key( data )
+        return (data.name or "unknown") .. data.src .. data.what .. data.line
+    end
+
+    local data = {}
+    local keys = {}
+    -- 记录函数信息
+    for func,info in pairs(self.caller_cache) do
+        local t = get_item(info)
+        fill_children(info, t)
+        local key = get_key(t)
+        if keys[key] and t.time then
+            local last = data[keys[key]]
+            last.count = last.count + t.count
+            last.time = last.time + t.time
+            -- 合并children
+            for i = 1, #t.children do
+                local k = get_key(t.children[i])
+                for i,c in ipairs(last.children) do
+                    if k == get_key(c) then
+                        k = i
+                        break
+                    end
+                end
+                if type(k) == "number" then
+                     -- 合并
+                    last.children[k].count = last.children[k].count + t.children[i].count
+                    if t.children[i].time and last.children[k].time then
+                        last.children[k].time = last.children[k].time + t.children[i].time
+                    else
+                        last.children[k].time = nil
+                    end
+                else
+                   table.insert(last.children, t.children[i])
+                end
+            end
+            last.children_time = last.children_time + t.children_time
+            if last.self_time and t.self_time then
+
+                last.self_time = last.self_time + t.self_time
+            else
+                last.self_time = nil
+            end
+        else
+            table.insert(data, t)
+            if t.time then -- 只合并有time的
+                keys[key] = #data
+            end
+        end
+    end
+    data.time_info = {
+        end_time = self.end_time,
+        start_time = self.start_time,
+    }
+    return data
+end
+
+
+
+-- require("LuaKit._load");
+-- local M = require("dumpToFile");
+-- dumpToFile = M.dumpToFile
+-- local a = require("anim1_layout")
+-- -- new_profiler = require("profiler2") -- Run this once per program only
+-- local profiler = new_profiler("call")
+-- profiler:start();
+-- dumpToFile("test2", a);
+-- profiler:stop();
+-- local a,b = profiler:dump_report_to_file( "profiler.txt" )
+-- dump(a)
+
+return new_profiler

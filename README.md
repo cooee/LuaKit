@@ -81,7 +81,7 @@ dump(player) --要测试的代码
 
 profiler:stop() --结束分析
 
-profiler:dump_report_to_file( "profiler.txt" ) --输出报告保存到文件
+profiler:dumpReportToFile( "profiler.txt" ) --输出报告保存到文件
 
 
 ```

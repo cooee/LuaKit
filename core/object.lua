@@ -2,10 +2,10 @@
 @Author: myc
 @Date:   2019-06-17 10:34:04
 @Last Modified by   YuchengMo
-@Last Modified time 2019-06-17 10:59:22
+@Last Modified time 2019-06-25 11:38:45
 ]]
 
-function class(name,super)
+function class(super,name)
     local classType = {};
 
     if super then
